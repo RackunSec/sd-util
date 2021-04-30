@@ -14,6 +14,8 @@
 #
 import sys # for exit() / args / etc
 import argparse # for arguments
+import re # regexp matching
+version="0.4.30.01"
 class prompt_color:
     bcolors = {
         'OKGREEN' : '\033[3m\033[92m ✔ ',
@@ -43,6 +45,8 @@ print(f"""{color['GREEN']}
 ░  ░  ░   ░ ░  ░       ░    ░    ░    ░        ░░   ░   ░   ▒   ░          ░      ░ ░ ░ ▒    ░░   ░
       ░     ░          ░  ░ ░    ░              ░           ░  ░░ ░                   ░ ░     ░
           ░                                                     ░
+
+Version: {version}
 {color['ENDC']}""")
 parser = argparse.ArgumentParser()
 parser.add_argument("--sd-dump", help="Specify the secretsdump.py output file to analyze.", type=argparse.FileType('r'))
@@ -56,5 +60,8 @@ if args.extract: # we are doing a simple extraction on the file provided:
     print(f"{color['OKGREEN']} ntdis.dit file: {args.sd_dump}{color['ENDC']}\n")
     for line in args.sd_dump:
         line_split = line.rstrip().split(":")
-        print(f"{line_split[3]}")
+        if len(line_split)>=4:
+            ntlm = line_split[3]
+            if re.match("[A-Fa-f0-9]{32}",ntlm):
+                print(f"{ntlm}")
 sys.exit()
