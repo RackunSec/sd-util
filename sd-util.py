@@ -125,7 +125,7 @@ elif args.correlate:
                             if not args.output: # output to file instead of screen
                                 print(f"{hc_ntlm}:{line_sd.rstrip()}")
                         if args.output: # print passwords only to a file instead
-                            print(f"{passwd}",file=args.output)
+                            print(f"{line_sd}, {passwd}",file=args.output)
             args.sd_dump.seek(0) # rewind
         print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{cracked_count}{color['ENDC']}) {color['GREEN']}total{color['ENDC']} hashes cracked.")
         print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{distinct_cracked_count}{color['ENDC']}) {color['GREEN']}distinct{color['ENDC']} hashes.")
