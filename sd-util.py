@@ -15,15 +15,12 @@
 import sys # for exit() / args / etc
 import argparse # for arguments
 import re # regexp matching
+from types import SimpleNamespace # for dot notation
+import os # for terminal column width
 ## Version - update this (year.mo.day.subv)
-version="0.5.03.01 (Green Ketchup)"
-## Password stats:
-upper_lower_end_number=0
-season_num=0
-season_full_year=0
-season_year=0
-season_year_special=0
-season_full_year_special=0
+version="0.5.18.01 (HBD Nana)"
+
+search_string={} # filter string (for client names, domain names, etc, to test password policy)
 ## Colors class:
 class prompt_color:
     bcolors = {
@@ -43,8 +40,8 @@ class prompt_color:
         'INFO': ' ',
         'BLINK': '\033[5m'
     }
-color = prompt_color.bcolors # create color object to use throughout.
-print(f"""{color['GREEN']}
+color = SimpleNamespace(** prompt_color.bcolors) # create color object to use throughout.
+print(f"""{color.GREEN}
   ██████ ▓█████▄         █    ██ ▄▄▄█████▓ ██▓ ██▓
 ▒██    ▒ ▒██▀ ██▌        ██  ▓██▒▓  ██▒ ▓▒▓██▒▓██▒
 ░ ▓██▄   ░██   █▌ ▓███  ▓██  ▒██░▒ ▓██░ ▒░▒██▒▒██░
@@ -57,27 +54,28 @@ print(f"""{color['GREEN']}
           ░                   ░            ░
                            ░                      ░
 Version: {version}
-{color['ENDC']}""")
+{color.ENDC}""")
 def quit_me():
-    print(f"{color['ENDC']}",end="")
+    print(f"{color.ENDC}",end="")
     sys.exit()
 parser = argparse.ArgumentParser()
 parser.add_argument("--sd-dump", help="Specify the secretsdump.py output file to analyze.", type=argparse.FileType('r'), required=True, metavar='SECRETSDUMP_FILE')
 parser.add_argument("--extract", help="Extract the NTLM hashes ONLY from the SD_DUMP file.",action="store_true")
 parser.add_argument("--correlate", help="Correlate Hashcat pot dump file to SD_DUMP. (REQUIRES --hashcat-pot argument)",action="store_true")
 parser.add_argument("--quiet", help="Do not print sensitive data to terminal.",action="store_true")
+parser.add_argument("--string", help="Specify a string to search for during the examination of stats.")
 parser.add_argument("--hashcat-pot", help="Specify the Hashcat pot dump file to analyze.", metavar='HASHCAT_OUTPUT_FILE', type=argparse.FileType('r'),)
-parser.add_argument("--output", help="Specify output file to put results into.", type=argparse.FileType('w'), metavar='OUTPUT_FILE')
 #parser.add_argument("--stats", help="Compile statistics for correlated secretsdump file.", action="store_true")
 args = parser.parse_args()
 
+#### Define methods here:
+#def analysis(passwd):
+#   ## thread this function for speed:
+
 #### WORKFLOW OF APP:
-print(f"{color['OKGREEN']}{color['ENDC']} Secretsdump.py output file:{color['GREEN']} {args.sd_dump.name}")
-if args.output:
-    print(f"{color['OKGREEN']} {color['ENDC']}Writing to output file: {color['GREEN']}{args.output.name}")
-#print(args) # debug
+print(f"{color.OKGREEN}{color.ENDC} Secretsdump.py output file:{color.GREEN} {args.sd_dump.name}")
 if args.extract: # we are doing a simple extraction on the file provided:
-    print(f"{color['OKGREEN']}{color['ENDC']} Dumping NTLM hashes.\n\n Press {color['BLINK']}{color['GREEN']}ENTER KEY{color['ENDC']} when ready{color['ENDC']} ({color['RED']}q to quit{color['ENDC']}) ... {color['RED']}\n")
+    print(f"{color.OKGREEN}{color.ENDC} Dumping NTLM hashes.\n\n Press {color.BLINK}{color.GREEN}ENTER KEY{color.ENDC} when ready{color.ENDC} ({color.RED}q to quit{color.ENDC}) ... {color.RED}\n")
     ans=input()
     if ans=="q" or ans == "Q":
         quit_me()
@@ -88,55 +86,169 @@ if args.extract: # we are doing a simple extraction on the file provided:
                 ntlm = line_split[3]
                 if re.match("[A-Fa-f0-9]{32}",ntlm):
                     print(f"{ntlm}")
-                    if args.output: # outputting to a file:
-                        print(f"{ntlm}",file=args.output)
+
 elif args.correlate:
     if args.hashcat_pot:
-        print(f"{color['OKGREEN']}{color['ENDC']} correlating Hashcat pot dump file: {color['GREEN']}{args.hashcat_pot.name}{color['ENDC']}\n\t{color['GREEN']}↳ {color['ENDC']}to secretsdump.py output file:{color['GREEN']} {args.sd_dump.name}")
-        print(f" \nPress {color['BLINK']}{color['GREEN']}ENTER KEY{color['ENDC']} when ready{color['ENDC']} ({color['RED']}q to quit{color['ENDC']}) ... {color['RED']}\n")
+        print(f"{color.OKGREEN}{color.ENDC} Correlating Hashcat pot dump file: {color.GREEN}{args.hashcat_pot.name}{color.ENDC}")
+        print(f"\t{color.GREEN}↳ {color.ENDC}to secretsdump.py output file:{color.GREEN} {args.sd_dump.name}")
+        if(args.string):
+            search_string=SimpleNamespace(**search_string) # make a sane object
+            search_string.raw=args.string # keep the raw value
+            search_string.count=0 # token
+            search_string.leet_snp={} # dafuq is this necessary?
+            search_string.leet=SimpleNamespace(**search_string.leet_snp) # store all leetsp3ak here.
+            search_string.leet_dd=[] # list of deduped l33tsp34ks
+            ## L33tsp43k B310w:
+            search_string.leet.a=re.sub("[aA]","4",search_string.raw)
+            search_string.leet.b=re.sub("[bB]","8",search_string.raw)
+            search_string.leet.e=re.sub("[eE]","3",search_string.raw)
+            search_string.leet.i=re.sub("[iI]","1",search_string.raw)
+            search_string.leet.g=re.sub("[Gg]","6",search_string.raw)
+            search_string.leet.o=re.sub("[oO]","0",search_string.raw)
+            search_string.leet.t=re.sub("[tT]","7",search_string.raw)
+            search_string.leet.r=re.sub("[Rr]","2",search_string.raw)
+            search_string.leet.s=re.sub("[Ss]","5",search_string.raw)
+            ## Special operators:
+            search_string.leet.a_at=re.sub("[aA]","@",search_string.raw)
+            search_string.leet.i_l=re.sub("[iI]","l",search_string.raw)
+            search_string.leet.s_dollar=re.sub("[Ss]","$",search_string.raw)
+            ## multiple mangles:
+            search_string.leet.a_b=re.sub("[bB]","8",search_string.leet.a)
+            search_string.leet.a_g=re.sub("[gG]","6",search_string.leet.a)
+            search_string.leet.a_e=re.sub("[Ee]","3",search_string.leet.a)
+            search_string.leet.a_s=re.sub("[Ss]","5",search_string.leet.a)
+            search_string.leet.a_i_l=re.sub("[lL]","3",search_string.leet.a)
+            search_string.leet.a_i=re.sub("[iI]","1",search_string.leet.a)
+            search_string.leet.a_o=re.sub("[oO]","3",search_string.leet.a)
+            search_string.leet.a_t=re.sub("[tT]","7",search_string.leet.a)
+            search_string.leet.a_r=re.sub("[Rr]","2",search_string.leet.a)
+            search_string.leet.b_e=re.sub("[Ee]","3",search_string.leet.b)
+            search_string.leet.b_g=re.sub("[Gg]","6",search_string.leet.b)
+            search_string.leet.b_s=re.sub("[Ss]","5",search_string.leet.b)
+            search_string.leet.b_i_l=re.sub("[lL]","3",search_string.leet.b)
+            search_string.leet.b_i=re.sub("[iI]","1",search_string.leet.b)
+            search_string.leet.b_o=re.sub("[oO]","3",search_string.leet.b)
+            search_string.leet.b_t=re.sub("[tT]","7",search_string.leet.b)
+            search_string.leet.b_r=re.sub("[Rr]","2",search_string.leet.b)
+            search_string.leet.e_s=re.sub("[Ss]","5",search_string.leet.e)
+            search_string.leet.e_g=re.sub("[Gg]","6",search_string.leet.e)
+            search_string.leet.e_i_l=re.sub("[lL]","3",search_string.leet.e)
+            search_string.leet.e_i=re.sub("[iI]","1",search_string.leet.e)
+            search_string.leet.e_o=re.sub("[oO]","3",search_string.leet.e)
+            search_string.leet.e_t=re.sub("[tT]","7",search_string.leet.e)
+            search_string.leet.e_r=re.sub("[Rr]","2",search_string.leet.e)
+            search_string.leet.i_s=re.sub("[Ss]","5",search_string.leet.i)
+            search_string.leet.i_g=re.sub("[Gg]","6",search_string.leet.i)
+            search_string.leet.i_o=re.sub("[oO]","3",search_string.leet.i)
+            search_string.leet.i_t=re.sub("[tT]","7",search_string.leet.i)
+            search_string.leet.i_r=re.sub("[Rr]","2",search_string.leet.i)
+            search_string.leet.g_s=re.sub("[Ss]","5",search_string.leet.g)
+            search_string.leet.g_o=re.sub("[oO]","3",search_string.leet.g)
+            search_string.leet.g_t=re.sub("[tT]","7",search_string.leet.g)
+            search_string.leet.g_r=re.sub("[Rr]","2",search_string.leet.g)
+            search_string.leet.o_s=re.sub("[Ss]","5",search_string.leet.o)
+            search_string.leet.o_t=re.sub("[tT]","7",search_string.leet.o)
+            search_string.leet.o_r=re.sub("[Rr]","2",search_string.leet.o)
+            search_string.leet.t_s=re.sub("[Ss]","5",search_string.leet.t)
+            search_string.leet.t_r=re.sub("[Rr]","2",search_string.leet.t)
+            ## ALL mangles:
+            search_string.leet.all=re.sub("[eE]","3",search_string.leet.a_b)
+            search_string.leet.all=re.sub("[iI]","1",search_string.leet.all)
+            search_string.leet.all=re.sub("[Gg]","6",search_string.leet.all)
+            search_string.leet.all=re.sub("[Oo]","0",search_string.leet.all)
+            search_string.leet.all=re.sub("[Rr]","2",search_string.leet.all)
+            search_string.leet.all=re.sub("[Ss]","5",search_string.leet.all)
+            ## DEDUPLICATE LIST:
+            for mangle in search_string.leet.__dict__:
+                if search_string.leet.__dict__[mangle] not in search_string.leet_dd:
+                    search_string.leet_dd.append(search_string.leet.__dict__[mangle])
+            print(f"{color.OKGREEN}{color.ENDC} L33tsp43k dict built. String to search: {color.GREEN}{search_string.raw}{color.ENDC}")
+
+        ## READY TO BEGIN:
+        ## TODO: There HAS to be a better way to do this?:
+        hashcat_pot_lines=args.hashcat_pot.readlines() # make a list rather than keep reading file.
+        hashcat_pot_lines_clean = []
+        for line in hashcat_pot_lines:
+            hashcat_pot_lines_clean.append(line.rstrip()) # really? >_>
+        del hashcat_pot_lines # destroy the raw copy
+        ## TODO: There HAS to be a better way to do this?:
+        sd_dump_lines=args.sd_dump.readlines() # make this a list as well for speed.
+        sd_dump_lines_clean = []
+        for line in sd_dump_lines:
+            sd_dump_lines_clean.append(line.rstrip()) # really? >_>
+        del sd_dump_lines # destroy the raw copy
+
+        print(f"{color.OKGREEN}{color.ENDC} Hashcat pot built as list.{color.ENDC}")
+        ## ASK USER TO BEGIN:
+        print(f" \nPress {color.BLINK}{color.GREEN}ENTER KEY{color.ENDC} when ready{color.ENDC} ({color.RED}q to quit{color.ENDC}) ... {color.RED}",end="")
         ans=input()
-        cracked_count=0 # counter
-        distinct_cracked_count=0
         if ans=="q" or ans == "Q":
             quit_me()
         ## Flow-through
-        # read the hashcat pot first to minimize our O(n)
-        for line_cracked in args.hashcat_pot:
-            distinct_cracked_count+=1
-            hc_ntlm=line_cracked.rstrip().split(":")[0]
-            passwd=line_cracked.rstrip().split(":")[1]
-            if re.match("[A-Fa-f0-9]{32}",hc_ntlm):
-                for line_sd in args.sd_dump:
-                    if hc_ntlm in line_sd:
-                        cracked_count+=1 # counter for stats
-                        if re.match("^[A-Z][a-z0-9]+[0-9]+$",passwd):
-                            upper_lower_end_number+=1
-                        if re.match("^(Spring|Summer|Fall|Winter)[0-9]+$",passwd):
-                            season_num+=1
-                        if re.match("^(Spring|Summer|Fall|Winter)(19|20)[0-9]{2}$",passwd):
-                            season_full_year+=1
-                        if re.match("^(Spring|Summer|Fall|Winter)(19|20|21|22|23|24|25)$",passwd):
-                            season_year+=1
-                        if re.match("^(Spring|Summer|Fall|Winter)(19|20|21|22|23|24|25)[^A-Za-z0-9_-]+$",passwd):
-                            season_year_special+=1
-                        if re.match("^(Spring|Summer|Fall|Winter)20[12][0-9][^A-Za-z0-9_-]+$",passwd):
-                            season_full_year_special+=1
-                        if not args.quiet: # sensitive info turned off
-                            if not args.output: # output to file instead of screen
-                                print(f"{hc_ntlm}:{line_sd.rstrip()}")
-                        if args.output: # print passwords only to a file instead
-                            line_sd_stripped = line_sd.rstrip()
-                            print(f"{line_sd_stripped}, {passwd}",file=args.output)
-            args.sd_dump.seek(0) # rewind
-        print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{cracked_count}{color['ENDC']}) {color['GREEN']}total{color['ENDC']} hashes cracked.")
-        print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{distinct_cracked_count}{color['ENDC']}) {color['GREEN']}distinct{color['ENDC']} hashes.")
-        print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{upper_lower_end_number}/{cracked_count}{color['ENDC']}) passwords in form of: \"{color['GREEN']}Alphanum beginning with upper and ending with number.{color['ENDC']}\"")
-        print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{season_num}/{cracked_count}{color['ENDC']}) passwords in form of: \"{color['GREEN']}Season capitalized ending with number.{color['ENDC']}\"")
-        print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{season_full_year}/{cracked_count}{color['ENDC']}) passwords in form of: \"{color['GREEN']}Season capitalized ending with full year.{color['ENDC']}\"")
-        print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{season_year}/{cracked_count}{color['ENDC']}) passwords in form of: \"{color['GREEN']}Season captialized ending with two-digit year.{color['ENDC']}\"")
-        print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{season_year_special}/{cracked_count}{color['ENDC']}) passwords in form of: \"{color['GREEN']}Season capitalized ending with two-digit year and special character.{color['ENDC']}\"")
-        print(f"{color['OKGREEN']} {color['ENDC']}({color['GREEN']}{season_full_year_special}/{cracked_count}{color['ENDC']}) passwords in form of: \"{color['GREEN']}Season capitalized ending with full year and special character.{color['ENDC']}\"\n")
+        ## Password stats:
+        upper_lower_end_number=0
+        season_num=0
+        season_full_year=0
+        season_year=0
+        season_year_special=0
+        season_full_year_special=0
+        cracked_count=0 # counter
+        hc_line_num=0
+        distinct_cracked_hashes = [] # list of dictinct passwds
+        for line_cracked in hashcat_pot_lines_clean: # hashcat_pot_lines is deduped by hashcat by default with "hashcat -m 1000 --show <file>"
+            ## split up the hashcat pot file output: ntlm:passwd
+            passwd=line_cracked.split(":")[1] # TODO - can this be a single call to split?
+            hc_ntlm=line_cracked.split(":")[0]
+            cracked_count+=sd_dump_lines_clean.count(hc_ntlm) # sd_dump from using THIS tool will produce ONLY NTLMs!
+            terminal_width=os.get_terminal_size().columns # placed down here in case terminal is resized during analysis.
+            ## store the distinct count:
+            if hc_ntlm not in distinct_cracked_hashes:
+                distinct_cracked_hashes.append(hc_ntlm)
+            hc_line_num+=1
+            print(f"\r{color.YELL}({color.ENDC}{color.BOLD}{hc_line_num}{color.ENDC}{color.YELL}){color.ENDC}{color.BOLD} ",end="")
+            print(f"Hashcat pot passwords analyzed. Current: ({passwd}) {color.ENDC}",end="\r")
+            print(" "*(int(terminal_width)-3),end="")
+            if re.match("[A-Fa-f0-9]{32}",hc_ntlm): # this is a valid NTLM
+                if hc_ntlm in sd_dump_lines_clean:
+                    if re.match("^[A-Z][a-z0-9]+[0-9]+$",passwd):
+                        upper_lower_end_number+=1
+                    if re.match("^(Spring|Summer|Fall|Winter)[0-9]+$",passwd):
+                        season_num+=1
+                    if re.match("^(Spring|Summer|Fall|Winter)(19|20)[0-9]{2}$",passwd):
+                        season_full_year+=1
+                    if re.match("^(Spring|Summer|Fall|Winter)(19|20|21|22|23|24|25)$",passwd):
+                        season_year+=1
+                    if re.match("^(Spring|Summer|Fall|Winter)(19|20|21|22|23|24|25)[^A-Za-z0-9_-]+$",passwd):
+                        season_year_special+=1
+                    if re.match("^(Spring|Summer|Fall|Winter)20[12][0-9][^A-Za-z0-9_-]+$",passwd):
+                        season_full_year_special+=1
+                    if not args.quiet: # sensitive info turned off
+                        if not args.output: # output to file instead of screen
+                            print(f"{hc_ntlm}:{passwd}")
+                    if args.string != "":
+                        if search_string.raw.lower() in passwd.lower():
+                            #print(f"{color.OKGREEN} {color.ENDC}Filter string discovered: {color.GREEN}{passwd}{color.ENDC}") # DEBUG
+                            search_string.count+=sd_dump_lines_clean.count(hc_ntlm) # count this hash
+                        else:
+                            for mangle in search_string.leet_dd: # this is a simple, deduped list
+                                if re.match(mangle.lower(),passwd.lower()):
+                                    search_string.count+=1
+                                    #print(f"{color.OKGREEN} {color.ENDC}Filter string discovered: {color.GREEN}{passwd}{color.ENDC}") # DEBUG
+
+        print(f"\r")
+        print(" "*(int(terminal_width)-3))
+        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{cracked_count}{color.ENDC}) {color.GREEN}total{color.ENDC} hashes cracked.")
+        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{len(distinct_cracked_hashes)}{color.ENDC}) {color.GREEN}distinct{color.ENDC} hashes.")
+        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{upper_lower_end_number}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Alphanum beginning with upper and ending with number.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_num}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season capitalized ending with number.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_full_year}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season capitalized ending with full year.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_year}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season captialized ending with two-digit year.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_year_special}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season capitalized ending with two-digit year and special character.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_full_year_special}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season capitalized ending with full year and special character.{color.ENDC}\"")
+        if args.string:
+            print(f"\n{color.OKGREEN} {color.ENDC}Filter string {search_string.raw} discovered: ({search_string.count}) times.")
     else:
-        print(f"{color['RED']} You must provide a Hashcat output file to use the --correlate function.")
+        print(f"{color.RED} You must provide a Hashcat output file to use the --correlate function.")
         quit_me()
+print("\n")
 quit_me() # done.
