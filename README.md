@@ -2,7 +2,7 @@
 Secretsdump.py Utility for Extracting and Coorelating Hashes and Avoiding User Data Breaches During Red Team Engagements. Using this tool, you can avoid breaching the rules of engagement, or breaching the client's sensitive data, by never exfiltrating the usernames of the domain from the secretsdump.py output. 
 1. Run secretsdump
 2. Extract the NTLMs and crack em
-3. Correlate them back to the secretsdump output and show stats
+3. Correlate them back to the secretsdump output and show stats for your pentest report
 ### STEP 0x00: RUN SECRETSDUMP.PY
 Run secretsdump.py against the domain controller and use the `-output` argument to save to a file: `client-sd-output.txt`
 ### STEP 0x01: EXTRACT NTLM HASHES
