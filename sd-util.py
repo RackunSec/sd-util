@@ -65,6 +65,7 @@ parser.add_argument("--correlate", help="Correlate Hashcat pot dump file to SD_D
 parser.add_argument("--quiet", help="Do not print sensitive data to terminal.",action="store_true")
 parser.add_argument("--string", help="Specify a string to search for during the examination of stats.")
 parser.add_argument("--hashcat-pot", help="Specify the Hashcat pot dump file to analyze.", metavar='HASHCAT_OUTPUT_FILE', type=argparse.FileType('r'),)
+parser.add_argument("--output", help="Specify output file to put results into.", type=argparse.FileType('w'), metavar='OUTPUT_FILE')
 #parser.add_argument("--stats", help="Compile statistics for correlated secretsdump file.", action="store_true")
 args = parser.parse_args()
 
@@ -85,7 +86,11 @@ if args.extract: # we are doing a simple extraction on the file provided:
             if len(line_split)>=4:
                 ntlm = line_split[3]
                 if re.match("[A-Fa-f0-9]{32}",ntlm):
-                    print(f"{ntlm}")
+                    if(args.output):
+                        print(f"{ntlm}",file=args.output)
+                    else: # just print to the screen
+                        print(f"{ntlm}")
+
 
 elif args.correlate:
     if args.hashcat_pot:
