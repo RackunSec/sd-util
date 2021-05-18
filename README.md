@@ -1,4 +1,4 @@
-# Secretsdump Utils
+# Secretsdump Password Analysis Utility
 Secretsdump.py Utility for Extracting and Coorelating Hashes and Avoiding User Data Breaches During Red Team Engagements. Using this tool, you can avoid breaching the rules of engagement, or breaching the client's sensitive data, by never exfiltrating the usernames of the domain from the secretsdump.py output. 
 1. Run secretsdump
 2. Extract the NTLMs and crack em
