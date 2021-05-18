@@ -3,21 +3,21 @@ Secretsdump.py Utility for Extracting and Coorelating Hashes and Avoiding User D
 1. Run secretsdump
 2. Extract the NTLMs and crack em
 3. Correlate them back to the secretsdump output and show stats
-## STEP 0x00 RUN SECRETSDUMP.PY
+### STEP 0x00: RUN SECRETSDUMP.PY
 Run secretsdump.py against the domain controller and use the `-output` argument to save to a file: `client-sd-output.txt`
-## STEP 0x01 EXTRACT NTLM HASHES
+### STEP 0x01: EXTRACT NTLM HASHES
 Extract JUST the NTML hashes for your cracking rig.
 ```
 ./sd-util.py --sd-dump client-sd-output.txt --extract --output client-sd-output-ntlms.txt
 ```
-## STEP 0x02 CRACK THE HASHES WITH HASHCAT
+### STEP 0x02: CRACK THE HASHES WITH HASHCAT
 Self explanatory: Copy your hashes file, `client-sd-output-ntlms.txt` to your cracking rig and crackem.
-## STEP 0x03 CREATE POT FILE OUTPUT FROM NTLMS
+### STEP 0x03: CREATE POT FILE OUTPUT FROM NTLMS
 Self explanatory: Run hashcat to show the cracked passwords and dump to a file:
 ```
 hashcat --show -m 1000 client-sd-output-ntlms.txt | tee -a client-sd-output-cracked.txt
 ```
-## STEP 0x04 CORRELATE NTLMS TO HASHES AND SHOW STATS
+### STEP 0x04: CORRELATE NTLMS TO HASHES AND SHOW STATS
 After step 0x03, copy your client-sd-output-cracked.txt back to your pentest computer and run the sd-util tool again like so:
 ```
 ./sd-util.py --correlate --sd-dump client-sd-output.txt --hashcat-pot client-sd-output-cracked.txt --quiet
