@@ -17,8 +17,9 @@ import argparse # for arguments
 import re # regexp matching
 from types import SimpleNamespace # for dot notation
 import os # for terminal column width
+import threading # he's going the distance. He's going for speeeeeeed.
 ## Version - update this (year.mo.day.subv)
-version="0.5.18.01 (HBD Nana)"
+version="0.5.18.03 (HBD Nana)"
 
 search_string={} # filter string (for client names, domain names, etc, to test password policy)
 ## Colors class:
@@ -69,10 +70,64 @@ parser.add_argument("--output", help="Specify output file to put results into.",
 #parser.add_argument("--stats", help="Compile statistics for correlated secretsdump file.", action="store_true")
 args = parser.parse_args()
 
-#### Define methods here:
-#def analysis(passwd):
-#   ## thread this function for speed:
+## Password stats (global so that threads can access them)
+upper_lower_end_number=0
+season_num=0
+season_full_year=0
+season_year=0
+season_year_special=0
+season_full_year_special=0
+cracked_count=0 # counter
+hc_line_num=0
+distinct_cracked_hashes = [] # list of dictinct passwds
+terminal_width=os.get_terminal_size().columns # placed down here in case terminal is resized during analysis.
 
+#### Define methods here:
+def analysis(passwd,hc_ntlm):
+    global upper_lower_end_number
+    global season_num
+    global season_full_year
+    global season_year
+    global season_year_special
+    global season_full_year_special
+    global cracked_count # counter
+    global hc_line_num
+    global distinct_cracked_hashes # list of dictinct passwds
+    global search_string
+    global args
+    terminal_width=os.get_terminal_size().columns # placed down here in case terminal is resized during analysis.
+    cracked_count+=sd_dump_lines_clean.count(hc_ntlm) # sd_dump from using THIS tool will produce ONLY NTLMs!
+
+    ## store the distinct count:
+    if hc_ntlm not in distinct_cracked_hashes:
+        distinct_cracked_hashes.append(hc_ntlm)
+    hc_line_num+=1
+    if re.match("[A-Fa-f0-9]{32}",hc_ntlm): # this is a valid NTLM
+        if hc_ntlm in sd_dump_lines_clean:
+            if re.match("^[A-Z][A-Za-z0-9]+[0-9]+$",passwd):
+                upper_lower_end_number+=1
+            if re.match("^(Spring|Summer|Fall|Winter)[0-9]+$",passwd):
+                season_num+=1
+            if re.match("^(Spring|Summer|Fall|Winter)(19|20)[0-9]{2}$",passwd):
+                season_full_year+=1
+            if re.match("^(Spring|Summer|Fall|Winter)(19|20|21|22|23|24|25)$",passwd):
+                season_year+=1
+            if re.match("^(Spring|Summer|Fall|Winter)(19|20|21|22|23|24|25)[^A-Za-z0-9_-]+$",passwd):
+                season_year_special+=1
+            if re.match("^(Spring|Summer|Fall|Winter)20[12][0-9][^A-Za-z0-9_-]+$",passwd):
+                season_full_year_special+=1
+            if not args.quiet: # sensitive info turned off
+                if not args.output: # output to file instead of screen
+                    print(f"{hc_ntlm}:{passwd}")
+            if args.string != None:
+                if search_string.raw.lower() in passwd.lower():
+                    #print(f"{color.OKGREEN} {color.ENDC}Filter string discovered: {color.GREEN}{passwd}{color.ENDC}") # DEBUG
+                    search_string.count+=sd_dump_lines_clean.count(hc_ntlm) # count this hash
+                else:
+                    for mangle in search_string.leet_dd: # this is a simple, deduped list
+                        if re.match(mangle.lower(),passwd.lower()):
+                            search_string.count+=1
+                            #print(f"{color.OKGREEN} {color.ENDC}Filter string discovered: {color.GREEN}{passwd}{color.ENDC}") # DEBUG
 #### WORKFLOW OF APP:
 print(f"{color.OKGREEN}{color.ENDC} Secretsdump.py output file:{color.GREEN} {args.sd_dump.name}")
 if args.extract: # we are doing a simple extraction on the file provided:
@@ -189,67 +244,39 @@ elif args.correlate:
         ans=input()
         if ans=="q" or ans == "Q":
             quit_me()
+
         ## Flow-through
-        ## Password stats:
-        upper_lower_end_number=0
-        season_num=0
-        season_full_year=0
-        season_year=0
-        season_year_special=0
-        season_full_year_special=0
-        cracked_count=0 # counter
-        hc_line_num=0
-        distinct_cracked_hashes = [] # list of dictinct passwds
         for line_cracked in hashcat_pot_lines_clean: # hashcat_pot_lines is deduped by hashcat by default with "hashcat -m 1000 --show <file>"
             ## split up the hashcat pot file output: ntlm:passwd
             passwd=line_cracked.split(":")[1] # TODO - can this be a single call to split?
             hc_ntlm=line_cracked.split(":")[0]
-            cracked_count+=sd_dump_lines_clean.count(hc_ntlm) # sd_dump from using THIS tool will produce ONLY NTLMs!
-            terminal_width=os.get_terminal_size().columns # placed down here in case terminal is resized during analysis.
-            ## store the distinct count:
-            if hc_ntlm not in distinct_cracked_hashes:
-                distinct_cracked_hashes.append(hc_ntlm)
-            hc_line_num+=1
             print(f"\r{color.YELL}({color.ENDC}{color.BOLD}{hc_line_num}{color.ENDC}{color.YELL}){color.ENDC}{color.BOLD} ",end="")
             print(f"Hashcat pot passwords analyzed. Current: ({passwd}) {color.ENDC}",end="\r")
             print(" "*(int(terminal_width)-3),end="")
-            if re.match("[A-Fa-f0-9]{32}",hc_ntlm): # this is a valid NTLM
-                if hc_ntlm in sd_dump_lines_clean:
-                    if re.match("^[A-Z][a-z0-9]+[0-9]+$",passwd):
-                        upper_lower_end_number+=1
-                    if re.match("^(Spring|Summer|Fall|Winter)[0-9]+$",passwd):
-                        season_num+=1
-                    if re.match("^(Spring|Summer|Fall|Winter)(19|20)[0-9]{2}$",passwd):
-                        season_full_year+=1
-                    if re.match("^(Spring|Summer|Fall|Winter)(19|20|21|22|23|24|25)$",passwd):
-                        season_year+=1
-                    if re.match("^(Spring|Summer|Fall|Winter)(19|20|21|22|23|24|25)[^A-Za-z0-9_-]+$",passwd):
-                        season_year_special+=1
-                    if re.match("^(Spring|Summer|Fall|Winter)20[12][0-9][^A-Za-z0-9_-]+$",passwd):
-                        season_full_year_special+=1
-                    if not args.quiet: # sensitive info turned off
-                        if not args.output: # output to file instead of screen
-                            print(f"{hc_ntlm}:{passwd}")
-                    if args.string != "":
-                        if search_string.raw.lower() in passwd.lower():
-                            #print(f"{color.OKGREEN} {color.ENDC}Filter string discovered: {color.GREEN}{passwd}{color.ENDC}") # DEBUG
-                            search_string.count+=sd_dump_lines_clean.count(hc_ntlm) # count this hash
-                        else:
-                            for mangle in search_string.leet_dd: # this is a simple, deduped list
-                                if re.match(mangle.lower(),passwd.lower()):
-                                    search_string.count+=1
-                                    #print(f"{color.OKGREEN} {color.ENDC}Filter string discovered: {color.GREEN}{passwd}{color.ENDC}") # DEBUG
-
+            thread = threading.Thread(target=analysis, args=(passwd,hc_ntlm,))
+            thread.start()
+            thread.join()
         print(f"\r")
         print(" "*(int(terminal_width)-3))
-        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{cracked_count}{color.ENDC}) {color.GREEN}total{color.ENDC} hashes cracked.")
-        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{len(distinct_cracked_hashes)}{color.ENDC}) {color.GREEN}distinct{color.ENDC} hashes.")
-        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{upper_lower_end_number}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Alphanum beginning with upper and ending with number.{color.ENDC}\"")
-        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_num}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season capitalized ending with number.{color.ENDC}\"")
-        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_full_year}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season capitalized ending with full year.{color.ENDC}\"")
-        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_year}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season captialized ending with two-digit year.{color.ENDC}\"")
-        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_year_special}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season capitalized ending with two-digit year and special character.{color.ENDC}\"")
-        print(f"{color.OKGREEN} {color.ENDC}({color.GREEN}{season_full_year_special}/{cracked_count}{color.ENDC}) passwords in form of: \"{color.GREEN}Season capitalized ending with full year and special character.{color.ENDC}\"")
+        cracked_percent=round((cracked_count/len(sd_dump_lines_clean)*100),2)
+        cracked_impact=""
+        if(cracked_percent<=10):
+            cracked_impact=f"{color.GREEN}{color.BOLD}LOW{color.ENDC}"
+        if(cracked_percent>10 and cracked_percent<=20):
+            cracked_impact=f"{color.YELL}{color.BOLD}MED{color.ENDC}"
+        if(cracked_percent>20 and cracked_percent<=30):
+            cracked_impact=f"{color.RED}{color.BOLD}HIGH{color.ENDC}"
+        if(cracked_percent>30):
+            cracked_impact=f"{color.RED}{color.BOLD}CRITICAL{color.ENDC}"        
+        print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{cracked_count}{color.ENDC}/{color.GREEN}{len(sd_dump_lines_clean)}{color.ENDC}]({str(cracked_percent)}%) {color.GREEN}total{color.ENDC} hashes cracked.",end="")
+        print(f" - IMPACT: {cracked_impact}")
+        print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{len(distinct_cracked_hashes)}/{color.GREEN}{cracked_count}{color.ENDC}] {color.GREEN}distinct{color.ENDC} hashes.")
+        print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{upper_lower_end_number}/{cracked_count}{color.ENDC}] passwords in form of: \"{color.GREEN}Alphanum beginning with upper and ending with number.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{season_num}/{cracked_count}{color.ENDC}] passwords in form of: \"{color.GREEN}Season capitalized ending with number.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{season_full_year}/{cracked_count}{color.ENDC}] passwords in form of: \"{color.GREEN}Season capitalized ending with full year.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{season_year}/{cracked_count}{color.ENDC}] passwords in form of: \"{color.GREEN}Season captialized ending with two-digit year.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{season_year_special}/{cracked_count}{color.ENDC}] passwords in form of: \"{color.GREEN}Season capitalized ending with two-digit year and special character.{color.ENDC}\"")
+        print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{season_full_year_special}/{cracked_count}{color.ENDC}] passwords in form of: \"{color.GREEN}Season capitalized ending with full year and special character.{color.ENDC}\"")
         if args.string:
             print(f"\n{color.OKGREEN} {color.ENDC}Filter string {search_string.raw} discovered: ({search_string.count}) times.")
     else:
