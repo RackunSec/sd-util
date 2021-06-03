@@ -19,7 +19,7 @@ from types import SimpleNamespace # for dot notation
 import os # for terminal column width
 import threading # he's going the distance. He's going for speeeeeeed.
 ## Version - update this (year.mo.day.subv)
-version="0.5.18.03 (HBD Nana)"
+version="0.6.3.a (Bruce Almighty)"
 
 search_string={} # filter string (for client names, domain names, etc, to test password policy)
 ## Colors class:
@@ -61,6 +61,7 @@ def quit_me():
     sys.exit()
 parser = argparse.ArgumentParser()
 parser.add_argument("--sd-dump", help="Specify the secretsdump.py output file to analyze.", type=argparse.FileType('r'), required=True, metavar='SECRETSDUMP_FILE')
+parser.add_argument("--ntds-file", help="Specify the raw output file from SecretsDump.", type=argparse.FileType('r'), metavar='NTDS_FILE')
 parser.add_argument("--extract", help="Extract the NTLM hashes ONLY from the SD_DUMP file.",action="store_true")
 parser.add_argument("--correlate", help="Correlate Hashcat pot dump file to SD_DUMP. (REQUIRES --hashcat-pot argument)",action="store_true")
 parser.add_argument("--quiet", help="Do not print sensitive data to terminal.",action="store_true")
@@ -151,6 +152,8 @@ elif args.correlate:
     if args.hashcat_pot:
         print(f"{color.OKGREEN}{color.ENDC} Correlating Hashcat pot dump file: {color.GREEN}{args.hashcat_pot.name}{color.ENDC}")
         print(f"\t{color.GREEN}↳ {color.ENDC}to secretsdump.py output file:{color.GREEN} {args.sd_dump.name}")
+        if args.output:
+            print(f"{color.OKGREEN}{color.ENDC} Dumping sensitive data to output file:{color.GREEN} {args.output.name}")
         if(args.string):
             search_string=SimpleNamespace(**search_string) # make a sane object
             search_string.raw=args.string # keep the raw value
@@ -250,6 +253,20 @@ elif args.correlate:
             ## split up the hashcat pot file output: ntlm:passwd
             passwd=line_cracked.split(":")[1] # TODO - can this be a single call to split?
             hc_ntlm=line_cracked.split(":")[0]
+            if args.output:
+                # read the ntds file and correlate the password to the hash:
+                for ntds_line in args.ntds_file.readlines():
+                    #print(f"processing: {ntds_line}")
+                    if ":" in ntds_line:
+                        try:
+                            ntds_ntlm = ntds_line.split(":")[3].rstrip()
+                            ntds_user = ntds_line.split(":")[0].rstrip()
+                            if re.match("[A-Fa-f0-9]{32}",ntds_ntlm): # we have an ntlm
+                                if ntds_ntlm == hc_ntlm: # output to the output file
+                                    print(f"{ntds_user}:{ntds_ntlm}:{passwd}",file=args.output)
+                        except:
+                            printf(f"{color.FAIL} We had an issue with: \"ntds_line\"{color.ENDC}")
+                args.ntds_file.seek(0) # reset the file.
             print(f"\r{color.YELL}({color.ENDC}{color.BOLD}{hc_line_num}{color.ENDC}{color.YELL}){color.ENDC}{color.BOLD} ",end="")
             print(f"Hashcat pot passwords analyzed. Current: ({passwd}) {color.ENDC}",end="\r")
             print(" "*(int(terminal_width)-3),end="")
@@ -267,7 +284,7 @@ elif args.correlate:
         if(cracked_percent>20 and cracked_percent<=30):
             cracked_impact=f"{color.RED}{color.BOLD}HIGH{color.ENDC}"
         if(cracked_percent>30):
-            cracked_impact=f"{color.RED}{color.BOLD}CRITICAL{color.ENDC}"        
+            cracked_impact=f"{color.RED}{color.BOLD}CRITICAL{color.ENDC}"
         print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{cracked_count}{color.ENDC}/{color.GREEN}{len(sd_dump_lines_clean)}{color.ENDC}]({str(cracked_percent)}%) {color.GREEN}total{color.ENDC} hashes cracked.",end="")
         print(f" - IMPACT: {cracked_impact}")
         print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{len(distinct_cracked_hashes)}/{color.GREEN}{cracked_count}{color.ENDC}] {color.GREEN}distinct{color.ENDC} hashes.")
