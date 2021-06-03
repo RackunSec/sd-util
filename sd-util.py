@@ -18,8 +18,9 @@ import re # regexp matching
 from types import SimpleNamespace # for dot notation
 import os # for terminal column width
 import threading # he's going the distance. He's going for speeeeeeed.
+import math # for digit counting / stats
 ## Version - update this (year.mo.day.subv)
-version="0.6.3.a (Bruce Almighty)"
+version="0.6.3.fe (Bruce Almighty)"
 
 search_string={} # filter string (for client names, domain names, etc, to test password policy)
 ## Colors class:
@@ -30,7 +31,8 @@ class prompt_color:
         'RED' : '\033[91m',
         'ENDC' : '\033[0m',
         'BOLD' : '\033[1m',
-        'YELL' : '\033[33m\033[3m',
+        'YELLOW' : '\033[33m',
+        'CYAN' : '\033[36m',
         'ITAL' : '\033[3m',
         'UNDER' : '\033[4m',
         'BLUE' : '\033[34m',
@@ -48,13 +50,13 @@ print(f"""{color.GREEN}
 ░ ▓██▄   ░██   █▌ ▓███  ▓██  ▒██░▒ ▓██░ ▒░▒██▒▒██░
   ▒   ██▒░▓█▄   ▌ ████  ▓▓█  ░██░░ ▓██▓ ░ ░██░▒██░
 ▒██████▒▒░▒████▓   ▒▒▓  ▒▒█████▓   ▒██▒ ░ ░██░░██████▒
-▒ ▒▓▒ ▒ ░ ▒▒▓  ▒   ░░▒  ░▒▓▒ ▒ ▒   ▒ ░░   ░▓  ░ ▒░▓  ░
+▒ ▒▓▒ ▒ ░ ▒▒▓  ▒   ░░▒  ░▒▓▒ ▒ ▒   ▒ ░░   ░▓  ▒ ▒░▓  ▒
 ░ ░▒  ░ ░ ░ ▒  ▒   ░    ░░▒░ ░ ░     ░     ▒ ░░ ░ ▒  ░
-░  ░  ░   ░ ░  ░         ░░░ ░ ░   ░       ▒ ░  ░ ░
+░  ░  ░   ░ ░  ░         ░░▒ ░ ░   ░       ▒ ░  ░ ░
       ░     ░       ░      ░               ░      ░  ░
-          ░                   ░            ░
-                           ░                      ░
-Version: {version}
+          ░                   ▒            ░
+SecretsDump-Util              ░                      ░
+Version: {version}   ░
 {color.ENDC}""")
 def quit_me():
     print(f"{color.ENDC}",end="")
@@ -82,9 +84,11 @@ cracked_count=0 # counter
 hc_line_num=0
 distinct_cracked_hashes = [] # list of dictinct passwds
 terminal_width=os.get_terminal_size().columns # placed down here in case terminal is resized during analysis.
+passwd_lengths=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
 #### Define methods here:
 def analysis(passwd,hc_ntlm):
+    global passwd_lengths
     global upper_lower_end_number
     global season_num
     global season_full_year
@@ -96,6 +100,11 @@ def analysis(passwd,hc_ntlm):
     global distinct_cracked_hashes # list of dictinct passwds
     global search_string
     global args
+    try:
+        passwd_lengths[len(passwd)]+=1
+    except:
+        pass
+    #print(f"{passwd_lengths}")
     terminal_width=os.get_terminal_size().columns # placed down here in case terminal is resized during analysis.
     cracked_count+=sd_dump_lines_clean.count(hc_ntlm) # sd_dump from using THIS tool will produce ONLY NTLMs!
 
@@ -267,7 +276,7 @@ elif args.correlate:
                         except:
                             printf(f"{color.FAIL} We had an issue with: \"ntds_line\"{color.ENDC}")
                 args.ntds_file.seek(0) # reset the file.
-            print(f"\r{color.YELL}({color.ENDC}{color.BOLD}{hc_line_num}{color.ENDC}{color.YELL}){color.ENDC}{color.BOLD} ",end="")
+            print(f"\r{color.YELLOW}({color.ENDC}{color.BOLD}{hc_line_num}{color.ENDC}{color.YELLOW}){color.ENDC}{color.BOLD} ",end="")
             print(f"Hashcat pot passwords analyzed. Current: ({passwd}) {color.ENDC}",end="\r")
             print(" "*(int(terminal_width)-3),end="")
             thread = threading.Thread(target=analysis, args=(passwd,hc_ntlm,))
@@ -278,13 +287,13 @@ elif args.correlate:
         cracked_percent=round((cracked_count/len(sd_dump_lines_clean)*100),2)
         cracked_impact=""
         if(cracked_percent<=10):
-            cracked_impact=f"{color.GREEN}{color.BOLD}LOW{color.ENDC}"
+            cracked_impact=f"{color.GREEN}{color.BOLD}☺  LOW  ☺{color.ENDC}"
         if(cracked_percent>10 and cracked_percent<=20):
-            cracked_impact=f"{color.YELL}{color.BOLD}MED{color.ENDC}"
+            cracked_impact=f"{color.YELLOW}{color.BOLD}☹  MED  ☹{color.ENDC}"
         if(cracked_percent>20 and cracked_percent<=30):
-            cracked_impact=f"{color.RED}{color.BOLD}HIGH{color.ENDC}"
+            cracked_impact=f"{color.RED}{color.BOLD}☹  HIGH  ☹{color.ENDC}"
         if(cracked_percent>30):
-            cracked_impact=f"{color.RED}{color.BOLD}CRITICAL{color.ENDC}"
+            cracked_impact=f"{color.RED}{color.BOLD}☠  CRITICAL  ☠{color.ENDC}"
         print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{cracked_count}{color.ENDC}/{color.GREEN}{len(sd_dump_lines_clean)}{color.ENDC}]({str(cracked_percent)}%) {color.GREEN}total{color.ENDC} hashes cracked.",end="")
         print(f" - IMPACT: {cracked_impact}")
         print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{len(distinct_cracked_hashes)}/{color.GREEN}{cracked_count}{color.ENDC}] {color.GREEN}distinct{color.ENDC} hashes.")
@@ -295,7 +304,31 @@ elif args.correlate:
         print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{season_year_special}/{cracked_count}{color.ENDC}] passwords in form of: \"{color.GREEN}Season capitalized ending with two-digit year and special character.{color.ENDC}\"")
         print(f"{color.OKGREEN} {color.ENDC}[{color.GREEN}{season_full_year_special}/{cracked_count}{color.ENDC}] passwords in form of: \"{color.GREEN}Season capitalized ending with full year and special character.{color.ENDC}\"")
         if args.string:
-            print(f"\n{color.OKGREEN} {color.ENDC}Filter string {search_string.raw} discovered: ({search_string.count}) times.")
+            print(f"{color.OKGREEN}{color.ENDC} Filter string \"{color.GREEN}{search_string.raw}{color.ENDC}\" discovered: ({color.GREEN}{search_string.count}{color.ENDC}) times.")
+        len_count=0
+        print(f"{color.OKGREEN}{color.ENDC} Cracked password length stats:\n    +--------+-------+\n    | {color.BOLD}Length{color.ENDC} | {color.BOLD}Count{color.ENDC} |")
+        for length in passwd_lengths:
+            if length != 0 and len_count != 0:
+                print("    +--------+-------+")
+                digits = int(math.log10(len_count))+1
+                padding = 8 - digits
+                padding_str = " "*padding
+                len_count_num = str(len_count)+padding_str
+                digits = int(math.log10(length))+1
+                padding = 7 - digits
+                padding_str = " "*padding
+                length_num = str(length)+padding_str
+
+                if len_count < 8: # RED
+                    print(f"    |{color.RED}{len_count_num}{color.ENDC}|{length_num}|")
+                elif len_count >=8 and len_count <=10: # YELLOW
+                    print(f"    |{color.YELLOW}{len_count_num}{color.ENDC}|{length_num}|")
+                elif len_count >=10 and len_count <=13: # ON DA GWEEN!
+                    print(f"    |{color.GREEN}{len_count_num}{color.ENDC}|{length_num}|")
+                else: # ON DA CYAN?!
+                    print(f"    |{color.CYAN}{len_count_num}{color.ENDC}|{length_num}|")
+            len_count+=1 # add to our token
+        print("    +--------+-------+")
     else:
         print(f"{color.RED} You must provide a Hashcat output file to use the --correlate function.")
         quit_me()
